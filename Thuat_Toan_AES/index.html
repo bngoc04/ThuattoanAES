@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CryptoVault - Mã hóa & Giải mã file</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary-color: #e1badd;
+            --secondary-color: #3f37c9;
+            --success-color: #d6b686;
+            --danger-color: #df9ebb;
+            --light-color: #f8f9fa;
+            --dark-color: #212529;
+        }
+        
+        body {
+            font-family: 'Roboto', sans-serif;
+            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+            min-height: 100vh;
+            margin: 0;
+            padding: 20px;
+            color: var(--dark-color);
+        }
+        
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+        }
+        
+        .card {
+            background-color: white;
+            border-radius: 12px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
+            margin-bottom: 30px;
+        }
+        
+        .card-header {
+            background: linear-gradient(to right, var(--primary-color), var(--secondary-color));
+            color: white;
+            padding: 20px;
+            text-align: center;
+        }
+        
+        .card-body {
+            padding: 30px;
+        }
+        
+        .btn {
+            border: none;
+            border-radius: 8px;
+            padding: 12px 24px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .btn i {
+            margin-right: 8px;
+        }
+        
+        .btn-primary {
+            background-color: var(--primary-color);
+            color: white;
+        }
+        
+        .btn-primary:hover {
+            background-color: var(--secondary-color);
+            transform: translateY(-2px);
+        }
+        
+        .btn-outline {
+            background-color: transparent;
+            border: 2px solid var(--primary-color);
+            color: var(--primary-color);
+        }
+        
+        .btn-outline:hover {
+            background-color: var(--primary-color);
+            color: white;
+        }
+        
+        .file-upload {
+            border: 2px dashed #ccc;
+            border-radius: 8px;
+            padding: 40px;
+            text-align: center;
+            margin-bottom: 20px;
+            transition: all 0.3s ease;
+            cursor: pointer;
+        }
+        
+        .file-upload:hover {
+            border-color: var(--primary-color);
+            background-color: rgba(67, 97, 238, 0.05);
+        }
+        
+        .file-upload i {
+            font-size: 48px;
+            color: var(--primary-color);
+            margin-bottom: 15px;
+        }
+        
+        .file-info {
+            margin-top: 15px;
+            font-size: 14px;
+            color: #666;
+        }
+        
+        .key-input {
+            position: relative;
+            margin-bottom: 20px;
+        }
+        
+        .key-input input {
+            width: 100%;
+            padding: 12px 15px;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            font-size: 16px;
+            transition: all 0.3s ease;
+        }
+        
+        .key-input input:focus {
+            border-color: var(--primary-color);
+            outline: none;
+            box-shadow: 0 0 0 3px rgba(67, 97, 238, 0.2);
+        }
+        
+        .key-toggle {
+            position: absolute;
+            right: 10px;
+            top: 50%;
+            transform: translateY(-50%);
+            cursor: pointer;
+            color: #666;
+        }
+        
+        .action-buttons {
+            display: flex;
+            gap: 15px;
+            margin-top: 25px;
+        }
+        
+        .progress-container {
+            margin-top: 20px;
+            display: none;
+        }
+        
+        .progress-bar {
+            height: 8px;
+            background-color: #e9ecef;
+            border-radius: 4px;
+            overflow: hidden;
+            margin-bottom: 10px;
+        }
+        
+        .progress {
+            height: 100%;
+            background: linear-gradient(to right, var(--success-color), var(--primary-color));
+            width: 0%;
+            transition: width 0.3s ease;
+        }
+        
+        .status-text {
+            font-size: 14px;
+            color: #666;
+            text-align: center;
+        }
+        
+        .alert {
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            display: none;
+        }
+        
+        .alert-success {
+            background-color: rgba(76, 201, 240, 0.2);
+            border: 1px solid var(--success-color);
+            color: #0a6b7e;
+        }
+        
+        .alert-danger {
+            background-color: rgba(247, 37, 133, 0.2);
+            border: 1px solid var(--danger-color);
+            color: #a4133c;
+        }
+        
+        .settings {
+            margin-top: 30px;
+            border-top: 1px solid #eee;
+            padding-top: 20px;
+        }
+        
+        .settings-title {
+            font-weight: 500;
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+            color: var(--primary-color);
+        }
+        
+        .settings-title i {
+            margin-right: 10px;
+        }
+        
+        .settings-options {
+            display: flex;
+            gap: 20px;
+            flex-wrap: wrap;
+        }
+        
+        .option {
+            display: flex;
+            align-items: center;
+        }
+        .option input {
+            margin-right: 8px;
+        }
+        
+        footer {
+            text-align: center;
+            margin-top: 40px;
+            color: #666;
+            font-size: 14px;
+        }
+        
+        @media (max-width: 768px) {
+            .action-buttons {
+                flex-direction: column;
+            }
+            
+            .btn {
+                width: 100%;
+            }
+        }
+    </style>
+</head>
+<body>
+        <div class="card">
+            <div class="card-header">
+                <h1><i class="fas fa-lock"></i> CryptoVault</h1>
+                <p>Mã hóa và giải mã file bằng thuật toán AES-256 an toàn</p>
+            </div>
+            <div class="card-body">
+                <div id="fileUpload" class="file-upload">
+                    <i class="fas fa-cloud-upload-alt"></i>
+                    <h3>Kéo thả file vào đây hoặc click để chọn</h3>
+                    <p class="file-info" id="fileInfo">Chưa có file nào được chọn</p>
+                    <input type="file" id="fileInput" style="display: none;">
+                </div>
+                
+                <div class="key-input">
+                    <input type="password" id="keyInput" placeholder="Nhập khóa bí mật (mật khẩu)">
+                    <span class="key-toggle" id="keyToggle"><i class="fas fa-eye"></i></span>
+                </div>
+                
+                <div class="alert alert-success" id="successAlert"></div>
+                <div class="alert alert-danger" id="errorAlert"></div>
+                
+                <div class="progress-container" id="progressContainer">
+                    <div class="progress-bar">
+                        <div class="progress" id="progressBar"></div>
+                    </div>
+                    <p class="status-text" id="statusText">Đang xử lý...</p>
+                </div>
+                
+                <div class="action-buttons">
+                    <button id="encryptBtn" class="btn btn-primary">
+                        <i class="fas fa-lock"></i> Mã hóa File
+                    </button>
+                    <button id="decryptBtn" class="btn btn-outline">
+                        <i class="fas fa-lock-open"></i> Giải mã File
+                    </button>
+                </div>
+                
+                <div class="settings">
+                    <h3 class="settings-title"><i class="fas fa-cog"></i> Cài đặt</h3>
+                    <div class="settings-options">
+                        <div class="option">
+                            <input type="checkbox" id="autoDownload" checked>
+                            <label for="autoDownload">Tự động tải về sau khi xử lý</label>
+                        </div>
+                        <div class="option">
+                            <input type="checkbox" id="removeMetadata" checked>
+                            <label for="removeMetadata">Xóa metadata file</label>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <footer>
+            <p>CryptoVault - Ứng dụng mã hóa file an toàn | Phiên bản 2.0</p>
+        </footer>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>
