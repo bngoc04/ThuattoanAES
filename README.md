@@ -1,5 +1,3 @@
-![image](https://github.com/user-attachments/assets/76d996dd-0815-4d30-9ff5-ee6021243bda)
-
 ## Chức năng chính
 
 1. **Mã hóa tệp tin**: 
@@ -21,3 +19,4 @@
 
 6. **Tính năng kéo và thả**:
    - Người dùng có thể kéo và thả tệp tin vào khu vực tải lên để chọn tệp tin một cách nhanh chóng và thuận tiện.
+![image](https://github.com/user-attachments/assets/76d996dd-0815-4d30-9ff5-ee6021243bda)
