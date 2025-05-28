@@ -1,0 +1,815 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WebSocket File Transfer Demo</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 20px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.2);
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(45deg, #667eea, #764ba2);
+            color: white;
+            padding: 30px;
+            text-align: center;
+            position: relative;
+        }
+
+        .header h1 {
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
+        }
+
+        .connection-status {
+            position: absolute;
+            top: 20px;
+            right: 30px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            background: rgba(255, 255, 255, 0.2);
+            padding: 10px 15px;
+            border-radius: 25px;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+        }
+
+        .status-dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: #ff4444;
+            animation: pulse 2s infinite;
+        }
+
+        .status-dot.connected {
+            background: #44ff44;
+        }
+
+        @keyframes pulse {
+            0% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.5; transform: scale(1.2); }
+            100% { opacity: 1; transform: scale(1); }
+        }
+
+        .main-content {
+            display: grid;
+            grid-template-columns: 1fr auto 1fr;
+            gap: 0;
+            min-height: 700px;
+        }
+
+        .server-side, .client-side {
+            padding: 30px;
+            position: relative;
+        }
+
+        .server-side {
+            background: linear-gradient(135deg, #ff6b6b 0%, #ee5a24 100%);
+            color: white;
+        }
+
+        .client-side {
+            background: linear-gradient(135deg, #00d2d3 0%, #54a0ff 100%);
+            color: white;
+        }
+
+        .socket-channel {
+            width: 100px;
+            background: linear-gradient(45deg, #2c3e50, #34495e);
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            color: white;
+        }
+
+        .socket-icon {
+            font-size: 3rem;
+            margin-bottom: 20px;
+            animation: socketPulse 3s infinite;
+        }
+
+        @keyframes socketPulse {
+            0%, 100% { transform: scale(1); opacity: 0.8; }
+            50% { transform: scale(1.1); opacity: 1; }
+        }
+
+        .data-flow {
+            position: absolute;
+            width: 8px;
+            height: 8px;
+            background: #00ff88;
+            border-radius: 50%;
+            box-shadow: 0 0 10px #00ff88;
+        }
+
+        .flow-up {
+            animation: flowUp 2s infinite;
+        }
+
+        .flow-down {
+            animation: flowDown 2s infinite;
+        }
+
+        @keyframes flowUp {
+            0% { bottom: 10%; opacity: 0; }
+            50% { opacity: 1; }
+            100% { bottom: 90%; opacity: 0; }
+        }
+
+        @keyframes flowDown {
+            0% { top: 10%; opacity: 0; }
+            50% { opacity: 1; }
+            100% { top: 90%; opacity: 0; }
+        }
+
+        .section-title {
+            font-size: 1.8rem;
+            margin-bottom: 25px;
+            text-align: center;
+            text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.3);
+        }
+
+        .upload-area {
+            border: 3px dashed rgba(255, 255, 255, 0.6);
+            border-radius: 15px;
+            padding: 30px 20px;
+            text-align: center;
+            margin-bottom: 25px;
+            transition: all 0.3s ease;
+            cursor: pointer;
+            background: rgba(255, 255, 255, 0.05);
+        }
+
+        .upload-area:hover {
+            border-color: rgba(255, 255, 255, 0.9);
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.2);
+        }
+
+        .upload-area.dragover {
+            border-color: #fff;
+            background: rgba(255, 255, 255, 0.15);
+            transform: scale(1.02);
+        }
+
+        .file-input {
+            display: none;
+        }
+
+        .socket-log {
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 10px;
+            padding: 20px;
+            height: 200px;
+            overflow-y: auto;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9rem;
+            margin-bottom: 20px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .log-entry {
+            margin-bottom: 5px;
+            padding: 3px 0;
+            border-left: 3px solid transparent;
+            padding-left: 10px;
+        }
+
+        .log-send {
+            border-left-color: #00ff88;
+            color: #00ff88;
+        }
+
+        .log-receive {
+            border-left-color: #ffaa00;
+            color: #ffaa00;
+        }
+
+        .log-error {
+            border-left-color: #ff4444;
+            color: #ff4444;
+        }
+
+        .log-info {
+            border-left-color: #44aaff;
+            color: #44aaff;
+        }
+
+        .file-list {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+            padding: 20px;
+            max-height: 250px;
+            overflow-y: auto;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .file-item {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 10px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            transition: all 0.3s ease;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .file-item:hover {
+            background: rgba(255, 255, 255, 0.2);
+            transform: translateX(5px);
+        }
+
+        .file-info {
+            flex: 1;
+        }
+
+        .file-name {
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+
+        .file-details {
+            font-size: 0.85rem;
+            opacity: 0.8;
+        }
+
+        .file-actions {
+            display: flex;
+            gap: 10px;
+        }
+
+        .btn {
+            background: rgba(255, 255, 255, 0.2);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            color: white;
+            padding: 8px 16px;
+            border-radius: 20px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-size: 0.85rem;
+        }
+
+        .btn:hover {
+            background: rgba(255, 255, 255, 0.3);
+            transform: scale(1.05);
+        }
+
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .progress-bar {
+            width: 100%;
+            height: 4px;
+            background: rgba(255, 255, 255, 0.3);
+            border-radius: 2px;
+            margin-top: 8px;
+            overflow: hidden;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: rgba(255, 255, 255, 0.8);
+            border-radius: 2px;
+            transition: width 0.3s ease;
+            width: 0%;
+        }
+
+        .controls {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 20px;
+            justify-content: center;
+        }
+
+        .simulate-btn {
+            background: linear-gradient(45deg, #ff6b6b, #ee5a24);
+            border: none;
+            color: white;
+            padding: 12px 24px;
+            border-radius: 25px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+        }
+
+        .simulate-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            margin-top: 20px;
+        }
+
+        .stat-item {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+            padding: 15px;
+            text-align: center;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .stat-number {
+            font-size: 1.5rem;
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+
+        .stat-label {
+            font-size: 0.9rem;
+            opacity: 0.8;
+        }
+
+        @media (max-width: 1024px) {
+            .main-content {
+                grid-template-columns: 1fr;
+                gap: 20px;
+            }
+            
+            .socket-channel {
+                width: 100%;
+                height: 80px;
+                flex-direction: row;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🔌 WebSocket File Transfer</h1>
+            <p>Real-time file transfer simulation using WebSocket protocol</p>
+            <div class="connection-status">
+                <div class="status-dot" id="statusDot"></div>
+                <span id="statusText">Connecting...</span>
+            </div>
+        </div>
+        
+        <div class="main-content">
+            <!-- Server Side -->
+            <div class="server-side">
+                <h2 class="section-title">🖥️ Server</h2>
+                
+                <div class="controls">
+                    <button class="simulate-btn" onclick="simulateConnection()">
+                        Connect WebSocket
+                    </button>
+                    <button class="simulate-btn" onclick="clearLogs()">
+                        Clear Logs
+                    </button>
+                </div>
+                
+                <div class="upload-area" onclick="document.getElementById('fileInput').click()">
+                    <div style="font-size: 2.5rem; margin-bottom: 15px;">📁</div>
+                    <h3>Upload Files via Socket</h3>
+                    <p>Files will be sent through WebSocket</p>
+                    <input type="file" id="fileInput" class="file-input" multiple>
+                </div>
+                
+                <div class="socket-log" id="serverLog">
+                    <div class="log-entry log-info">[Server] WebSocket server started on port 8080</div>
+                    <div class="log-entry log-info">[Server] Waiting for connections...</div>
+                </div>
+                
+                <div class="file-list">
+                    <h4>📂 Server Files:</h4>
+                    <div id="serverFileList"></div>
+                </div>
+                
+                <div class="stats-grid">
+                    <div class="stat-item">
+                        <div class="stat-number" id="serverFiles">0</div>
+                        <div class="stat-label">Files Stored</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-number" id="serverSize">0 KB</div>
+                        <div class="stat-label">Total Size</div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- WebSocket Channel -->
+            <div class="socket-channel">
+                <div class="socket-icon">🔌</div>
+                <div style="font-size: 0.8rem; text-align: center; writing-mode: vertical-rl;">
+                    WebSocket
+                </div>
+                <div class="data-flow flow-up" id="dataUp"></div>
+                <div class="data-flow flow-down" id="dataDown"></div>
+            </div>
+            
+            <!-- Client Side -->
+            <div class="client-side">
+                <h2 class="section-title">💻 Client</h2>
+                
+                <div class="controls">
+                    <button class="simulate-btn" onclick="requestFileList()">
+                        Request Files
+                    </button>
+                    <button class="simulate-btn" onclick="sendMessage()">
+                        Send Message
+                    </button>
+                </div>
+                
+                <div class="socket-log" id="clientLog">
+                    <div class="log-entry log-info">[Client] Initializing WebSocket connection...</div>
+                    <div class="log-entry log-info">[Client] Ready to connect</div>
+                </div>
+                
+                <div class="file-list">
+                    <h4>📥 Received Files:</h4>
+                    <div id="clientFileList"></div>
+                </div>
+                
+                <div class="stats-grid">
+                    <div class="stat-item">
+                        <div class="stat-number" id="messagesReceived">0</div>
+                        <div class="stat-label">Messages</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-number" id="bytesTransferred">0 KB</div>
+                        <div class="stat-label">Transferred</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // WebSocket simulation state
+        let isConnected = false;
+        let serverFiles = [];
+        let clientFiles = [];
+        let messageCount = 0;
+        let totalBytesTransferred = 0;
+
+        // DOM elements
+        const fileInput = document.getElementById('fileInput');
+        const serverLog = document.getElementById('serverLog');
+        const clientLog = document.getElementById('clientLog');
+        const serverFileList = document.getElementById('serverFileList');
+        const clientFileList = document.getElementById('clientFileList');
+        const statusDot = document.getElementById('statusDot');
+        const statusText = document.getElementById('statusText');
+        const uploadArea = document.querySelector('.upload-area');
+
+        // Initialize
+        fileInput.addEventListener('change', handleFileUpload);
+        setupDragAndDrop();
+        updateConnectionStatus();
+
+        function setupDragAndDrop() {
+            uploadArea.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                uploadArea.classList.add('dragover');
+            });
+
+            uploadArea.addEventListener('dragleave', () => {
+                uploadArea.classList.remove('dragover');
+            });
+
+            uploadArea.addEventListener('drop', (e) => {
+                e.preventDefault();
+                uploadArea.classList.remove('dragover');
+                const files = Array.from(e.dataTransfer.files);
+                uploadFiles(files);
+            });
+        }
+
+        function simulateConnection() {
+            if (isConnected) return;
+            
+            logServer('Establishing WebSocket connection...', 'info');
+            logClient('Connecting to ws://localhost:8080', 'info');
+            
+            setTimeout(() => {
+                isConnected = true;
+                updateConnectionStatus();
+                logServer('✅ Client connected successfully', 'info');
+                logClient('✅ Connected to server', 'info');
+                
+                // Simulate handshake
+                setTimeout(() => {
+                    logClient('📤 Sending handshake...', 'send');
+                    logServer('📥 Handshake received', 'receive');
+                    logServer('📤 Sending acknowledgment', 'send');
+                    logClient('📥 Connection established', 'receive');
+                }, 500);
+            }, 1000);
+        }
+
+        function handleFileUpload(e) {
+            const files = Array.from(e.target.files);
+            uploadFiles(files);
+        }
+
+        function uploadFiles(files) {
+            if (!isConnected) {
+                logServer('❌ No WebSocket connection', 'error');
+                return;
+            }
+
+            files.forEach((file, index) => {
+                setTimeout(() => {
+                    uploadFileViaSocket(file);
+                }, index * 1000);
+            });
+        }
+
+        function uploadFileViaSocket(file) {
+            const fileData = {
+                id: Date.now() + Math.random(),
+                name: file.name,
+                size: file.size,
+                type: file.type,
+                timestamp: new Date(),
+                content: file
+            };
+
+            // Simulate file chunking for large files
+            const chunkSize = Math.max(1, Math.ceil(file.size / 10240)); // Simulate chunks
+            let progress = 0;
+
+            logServer(`📤 Sending file: ${file.name} (${formatFileSize(file.size)})`, 'send');
+            logClient(`📥 Receiving: ${file.name}`, 'receive');
+
+            const uploadInterval = setInterval(() => {
+                progress += 10;
+                
+                if (progress <= 100) {
+                    logServer(`📊 Upload progress: ${progress}%`, 'info');
+                    showDataFlow('up');
+                } else {
+                    clearInterval(uploadInterval);
+                    
+                    // Add to server files
+                    serverFiles.push(fileData);
+                    logServer(`✅ Upload complete: ${file.name}`, 'info');
+                    
+                    // Auto-transfer to client
+                    setTimeout(() => {
+                        transferToClient(fileData);
+                    }, 500);
+                    
+                    updateServerDisplay();
+                }
+            }, 200);
+        }
+
+        function transferToClient(fileData) {
+            logServer(`📤 Transferring to client: ${fileData.name}`, 'send');
+            logClient(`📥 Downloading: ${fileData.name}`, 'receive');
+            
+            showDataFlow('down');
+            
+            setTimeout(() => {
+                clientFiles.push({
+                    ...fileData,
+                    receivedAt: new Date()
+                });
+                
+                messageCount++;
+                totalBytesTransferred += fileData.size;
+                
+                logClient(`✅ File received: ${fileData.name}`, 'info');
+                updateClientDisplay();
+                updateStats();
+            }, 1500);
+        }
+
+        function requestFileList() {
+            if (!isConnected) {
+                logClient('❌ No connection', 'error');
+                return;
+            }
+
+            logClient('📤 Requesting file list...', 'send');
+            showDataFlow('up');
+            
+            setTimeout(() => {
+                logServer('📥 File list request received', 'receive');
+                logServer(`📤 Sending file list (${serverFiles.length} files)`, 'send');
+                showDataFlow('down');
+                
+                setTimeout(() => {
+                    logClient(`📥 File list received (${serverFiles.length} files)`, 'receive');
+                    messageCount++;
+                    updateStats();
+                }, 800);
+            }, 500);
+        }
+
+        function sendMessage() {
+            if (!isConnected) {
+                logClient('❌ No connection', 'error');
+                return;
+            }
+
+            const messages = [
+                'Hello Server!',
+                'Ping',
+                'Status check',
+                'Keep alive',
+                'Test message'
+            ];
+            
+            const message = messages[Math.floor(Math.random() * messages.length)];
+            
+            logClient(`📤 Sending: "${message}"`, 'send');
+            showDataFlow('up');
+            
+            setTimeout(() => {
+                logServer(`📥 Message: "${message}"`, 'receive');
+                logServer('📤 ACK', 'send');
+                showDataFlow('down');
+                
+                setTimeout(() => {
+                    logClient('📥 Message acknowledged', 'receive');
+                    messageCount++;
+                    updateStats();
+                }, 300);
+            }, 400);
+        }
+
+        function downloadFile(fileId) {
+            if (!isConnected) {
+                logClient('❌ No connection', 'error');
+                return;
+            }
+
+            const file = serverFiles.find(f => f.id === fileId);
+            if (!file) return;
+
+            logClient(`📤 Requesting download: ${file.name}`, 'send');
+            showDataFlow('up');
+            
+            setTimeout(() => {
+                logServer(`📥 Download request: ${file.name}`, 'receive');
+                transferToClient(file);
+            }, 300);
+        }
+
+        function showDataFlow(direction) {
+            const element = document.getElementById(direction === 'up' ? 'dataUp' : 'dataDown');
+            element.style.display = 'block';
+            setTimeout(() => {
+                element.style.display = 'none';
+            }, 2000);
+        }
+
+        function updateConnectionStatus() {
+            if (isConnected) {
+                statusDot.classList.add('connected');
+                statusText.textContent = 'Connected';
+            } else {
+                statusDot.classList.remove('connected');
+                statusText.textContent = 'Disconnected';
+            }
+        }
+
+        function updateServerDisplay() {
+            serverFileList.innerHTML = '';
+            
+            if (serverFiles.length === 0) {
+                serverFileList.innerHTML = '<p style="text-align: center; opacity: 0.7;">No files</p>';
+            } else {
+                serverFiles.forEach(file => {
+                    const fileElement = document.createElement('div');
+                    fileElement.className = 'file-item';
+                    fileElement.innerHTML = `
+                        <div class="file-info">
+                            <div class="file-name">${file.name}</div>
+                            <div class="file-details">${formatFileSize(file.size)} • ${formatTime(file.timestamp)}</div>
+                        </div>
+                        <div class="file-actions">
+                            <button class="btn" onclick="downloadFile(${file.id})" ${!isConnected ? 'disabled' : ''}>
+                                📤 Send
+                            </button>
+                        </div>
+                    `;
+                    serverFileList.appendChild(fileElement);
+                });
+            }
+        }
+
+        function updateClientDisplay() {
+            clientFileList.innerHTML = '';
+            
+            if (clientFiles.length === 0) {
+                clientFileList.innerHTML = '<p style="text-align: center; opacity: 0.7;">No files received</p>';
+            } else {
+                clientFiles.forEach(file => {
+                    const fileElement = document.createElement('div');
+                    fileElement.className = 'file-item';
+                    fileElement.innerHTML = `
+                        <div class="file-info">
+                            <div class="file-name">✅ ${file.name}</div>
+                            <div class="file-details">${formatFileSize(file.size)} • ${formatTime(file.receivedAt)}</div>
+                        </div>
+                        <div class="file-actions">
+                            <button class="btn" onclick="saveFile(${file.id})">
+                                💾 Save
+                            </button>
+                        </div>
+                    `;
+                    clientFileList.appendChild(fileElement);
+                });
+            }
+        }
+
+        function saveFile(fileId) {
+            const file = clientFiles.find(f => f.id === fileId);
+            if (file && file.content) {
+                const url = URL.createObjectURL(file.content);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = file.name;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+                
+                logClient(`💾 File saved: ${file.name}`, 'info');
+            }
+        }
+
+        function updateStats() {
+            document.getElementById('serverFiles').textContent = serverFiles.length;
+            document.getElementById('serverSize').textContent = formatFileSize(
+                serverFiles.reduce((sum, f) => sum + f.size, 0)
+            );
+            document.getElementById('messagesReceived').textContent = messageCount;
+            document.getElementById('bytesTransferred').textContent = formatFileSize(totalBytesTransferred);
+        }
+
+        function clearLogs() {
+            serverLog.innerHTML = '<div class="log-entry log-info">[Server] Logs cleared</div>';
+            clientLog.innerHTML = '<div class="log-entry log-info">[Client] Logs cleared</div>';
+        }
+
+        function logServer(message, type) {
+            const entry = document.createElement('div');
+            entry.className = `log-entry log-${type}`;
+            entry.textContent = `[${formatTime(new Date())}] ${message}`;
+            serverLog.appendChild(entry);
+            serverLog.scrollTop = serverLog.scrollHeight;
+        }
+
+        function logClient(message, type) {
+            const entry = document.createElement('div');
+            entry.className = `log-entry log-${type}`;
+            entry.textContent = `[${formatTime(new Date())}] ${message}`;
+            clientLog.appendChild(entry);
+            clientLog.scrollTop = clientLog.scrollHeight;
+        }
+
+        function formatFileSize(bytes) {
+            if (bytes === 0) return '0 Bytes';
+            const k = 1024;
+            const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+        }
+
+        function formatTime(date) {
+            return date.toLocaleTimeString('vi-VN');
+        }
+
+        // Initialize displays
+        updateServerDisplay();
+        updateClientDisplay();
+        updateStats();
+    </script>
+</body>
+</html>
