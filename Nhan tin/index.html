@@ -1,0 +1,834 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chat Bảo Mật AES</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.2/socket.io.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #cf9ae2 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .container {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            overflow: hidden;
+            width: 90%;
+            max-width: 1000px;
+            height: 600px;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .auth-container {
+            padding: 40px;
+            text-align: center;
+            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+        }
+
+        .auth-form {
+            background: white;
+            padding: 30px;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+            max-width: 400px;
+            margin: 0 auto;
+        }
+
+        .auth-form h2 {
+            color: #333;
+            margin-bottom: 30px;
+            font-size: 2em;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+            text-align: left;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            color: #555;
+            font-weight: 500;
+        }
+
+        .form-group input {
+            width: 100%;
+            padding: 12px 15px;
+            border: 2px solid #e1e5e9;
+            border-radius: 8px;
+            font-size: 16px;
+            transition: border-color 0.3s;
+        }
+
+        .form-group input:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .btn {
+            width: 100%;
+            padding: 12px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            cursor: pointer;
+            transition: transform 0.2s;
+            margin-bottom: 10px;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+        }
+
+        .btn-secondary {
+            background: #6c757d;
+        }
+
+        .chat-header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .chat-header h1 {
+            font-size: 1.5em;
+        }
+
+        .user-info {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .online-status {
+            background: #28a745;
+            color: white;
+            padding: 5px 10px;
+            border-radius: 15px;
+            font-size: 0.8em;
+        }
+
+        .chat-main {
+            display: flex;
+            flex: 1;
+            overflow: hidden;
+        }
+
+        .sidebar {
+            width: 250px;
+            background: #f8f9fa;
+            border-right: 1px solid #dee2e6;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .encryption-panel {
+            padding: 20px;
+            border-bottom: 1px solid #dee2e6;
+        }
+
+        .encryption-panel h3 {
+            margin-bottom: 15px;
+            color: #333;
+            font-size: 1.1em;
+        }
+
+        .key-input {
+            width: 100%;
+            padding: 10px;
+            border: 2px solid #e1e5e9;
+            border-radius: 6px;
+            margin-bottom: 10px;
+            font-family: monospace;
+        }
+
+        .key-length {
+            font-size: 0.9em;
+            color: #666;
+            margin-bottom: 10px;
+        }
+
+        .online-users {
+            flex: 1;
+            padding: 20px;
+        }
+
+        .online-users h3 {
+            margin-bottom: 15px;
+            color: #333;
+            font-size: 1.1em;
+        }
+
+        .user-list {
+            list-style: none;
+        }
+
+        .user-item {
+            padding: 10px;
+            background: white;
+            margin-bottom: 8px;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+
+        .user-avatar {
+            width: 30px;
+            height: 30px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: bold;
+        }
+
+        .chat-area {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .messages-container {
+            flex: 1;
+            padding: 20px;
+            overflow-y: auto;
+            background: #fafbfc;
+        }
+
+        .message {
+            margin-bottom: 15px;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .message.own {
+            align-items: flex-end;
+        }
+
+        .message-header {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 5px;
+            font-size: 0.9em;
+            color: #666;
+        }
+
+        .message.own .message-header {
+            flex-direction: row-reverse;
+        }
+
+        .message-bubble {
+            max-width: 70%;
+            padding: 12px 16px;
+            border-radius: 18px;
+            word-wrap: break-word;
+        }
+
+        .message-bubble.other {
+            background: white;
+            border: 1px solid #e1e5e9;
+        }
+
+        .message-bubble.own {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        .encryption-indicator {
+            font-size: 0.8em;
+            margin-top: 5px;
+            color: #28a745;
+        }
+
+        .input-area {
+            padding: 20px;
+            border-top: 1px solid #dee2e6;
+            background: white;
+        }
+
+        .input-container {
+            display: flex;
+            gap: 10px;
+            align-items: flex-end;
+        }
+
+        .message-input {
+            flex: 1;
+            padding: 12px 15px;
+            border: 2px solid #e1e5e9;
+            border-radius: 20px;
+            resize: none;
+            max-height: 100px;
+            font-family: inherit;
+        }
+
+        .message-input:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .send-btn {
+            padding: 12px 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 20px;
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+
+        .send-btn:hover {
+            transform: scale(1.05);
+        }
+
+        .send-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .system-message {
+            text-align: center;
+            color: #666;
+            font-style: italic;
+            margin: 10px 0;
+            padding: 10px;
+            background: rgba(102, 126, 234, 0.1);
+            border-radius: 10px;
+        }
+
+        .error-message {
+            background: #f8d7da;
+            color: #721c24;
+            padding: 10px;
+            border-radius: 5px;
+            margin: 10px 0;
+            text-align: center;
+        }
+
+        .success-message {
+            background: #d4edda;
+            color: #155724;
+            padding: 10px;
+            border-radius: 5px;
+            margin: 10px 0;
+            text-align: center;
+        }
+
+        .hidden {
+            display: none !important;
+        }
+
+        @media (max-width: 768px) {
+            .container {
+                height: 100vh;
+                border-radius: 0;
+            }
+            
+            .sidebar {
+                width: 200px;
+            }
+            
+            .chat-main {
+                flex-direction: column;
+            }
+            
+            .sidebar {
+                width: 100%;
+                height: 200px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Màn hình đăng nhập/đăng ký -->
+    <div id="authScreen" class="container">
+        <div class="auth-container">
+            <div class="auth-form">
+                <h2 id="authTitle">Đăng Nhập</h2>
+                
+                <div id="errorMessage" class="error-message hidden"></div>
+                <div id="successMessage" class="success-message hidden"></div>
+                
+                <form id="authForm">
+                    <div class="form-group">
+                        <label for="username">Tên đăng nhập:</label>
+                        <input type="text" id="username" required>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="password">Mật khẩu:</label>
+                        <input type="password" id="password" required>
+                    </div>
+                    
+                    <div class="form-group" id="confirmPasswordGroup" style="display: none;">
+                        <label for="confirmPassword">Xác nhận mật khẩu:</label>
+                        <input type="password" id="confirmPassword">
+                    </div>
+                    
+                    <button type="submit" class="btn" id="authSubmitBtn">Đăng Nhập</button>
+                    <button type="button" class="btn btn-secondary" id="toggleAuthBtn">Chưa có tài khoản? Đăng ký</button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Màn hình chat -->
+    <div id="chatScreen" class="container hidden">
+        <!-- Header -->
+        <div class="chat-header">
+            <h1>🔒 Chat Bảo Mật AES</h1>
+            <div class="user-info">
+                <span id="currentUser"></span>
+                <span class="online-status" id="onlineStatus">Online</span>
+                <button class="btn" onclick="logout()" style="width: auto; padding: 8px 15px; margin: 0;">Đăng Xuất</button>
+            </div>
+        </div>
+
+        <div class="chat-main">
+            <!-- Sidebar -->
+            <div class="sidebar">
+                <!-- Panel mã hóa -->
+                <div class="encryption-panel">
+                    <h3>🔐 Mã Hóa AES</h3>
+                    <input type="password" class="key-input" id="encryptionKey" placeholder="Nhập khóa mã hóa...">
+                    <div class="key-length" id="keyLength">Độ dài: 0 ký tự</div>
+                    <button class="btn" onclick="setEncryptionKey()" style="width: 100%; padding: 8px;">Đặt Khóa</button>
+                    <div id="encryptionStatus" style="margin-top: 10px; font-size: 0.9em; color: #666;">Chưa đặt khóa</div>
+                </div>
+
+                <!-- Danh sách người dùng online -->
+                <div class="online-users">
+                    <h3>👥 Người Dùng Online (<span id="userCount">0</span>)</h3>
+                    <ul class="user-list" id="userList"></ul>
+                </div>
+            </div>
+
+            <!-- Khu vực chat -->
+            <div class="chat-area">
+                <div class="messages-container" id="messagesContainer">
+                    <div class="system-message">
+                        Chào mừng đến với Chat Bảo Mật! Vui lòng đặt khóa mã hóa để bắt đầu.
+                    </div>
+                </div>
+
+                <div class="input-area">
+                    <div class="input-container">
+                        <textarea class="message-input" id="messageInput" placeholder="Nhập tin nhắn..." rows="1" disabled></textarea>
+                        <button class="send-btn" id="sendBtn" onclick="sendMessage()" disabled>Gửi</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Quản lý state ứng dụng
+        let currentUser = '';
+        let users = {};
+        let encryptionKey = '';
+        let isLoggedIn = false;
+        let isRegistering = false;
+
+        // Khởi tạo ứng dụng
+        document.addEventListener('DOMContentLoaded', function() {
+            initializeAuth();
+            setupEventListeners();
+        });
+
+        function initializeAuth() {
+            // Kiểm tra localStorage xem có user đã đăng nhập không
+            const savedUser = localStorage.getItem('currentUser');
+            if (savedUser) {
+                currentUser = savedUser;
+                showChatScreen();
+            }
+        }
+
+        function setupEventListeners() {
+            // Form đăng nhập/đăng ký
+            document.getElementById('authForm').addEventListener('submit', handleAuth);
+            document.getElementById('toggleAuthBtn').addEventListener('click', toggleAuthMode);
+            
+            // Encryption key
+            document.getElementById('encryptionKey').addEventListener('input', updateKeyLength);
+            document.getElementById('encryptionKey').addEventListener('keypress', function(e) {
+                if (e.key === 'Enter') {
+                    setEncryptionKey();
+                }
+            });
+            
+            // Message input
+            document.getElementById('messageInput').addEventListener('keypress', function(e) {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    sendMessage();
+                }
+            });
+
+            // Auto-resize textarea
+            document.getElementById('messageInput').addEventListener('input', function() {
+                this.style.height = 'auto';
+                this.style.height = this.scrollHeight + 'px';
+            });
+        }
+
+        // Xử lý đăng nhập/đăng ký
+        function handleAuth(e) {
+            e.preventDefault();
+            
+            const username = document.getElementById('username').value.trim();
+            const password = document.getElementById('password').value;
+            const confirmPassword = document.getElementById('confirmPassword').value;
+            
+            if (!username || !password) {
+                showError('Vui lòng điền đầy đủ thông tin!');
+                return;
+            }
+            
+            if (isRegistering) {
+                if (password !== confirmPassword) {
+                    showError('Mật khẩu xác nhận không khớp!');
+                    return;
+                }
+                handleRegister(username, password);
+            } else {
+                handleLogin(username, password);
+            }
+        }
+
+        function handleLogin(username, password) {
+            // Mô phỏng đăng nhập (trong thực tế sẽ gửi request đến server)
+            const users = JSON.parse(localStorage.getItem('registeredUsers') || '{}');
+            
+            if (users[username] && users[username] === hashPassword(password)) {
+                currentUser = username;
+                localStorage.setItem('currentUser', username);
+                showSuccess('Đăng nhập thành công!');
+                setTimeout(() => {
+                    showChatScreen();
+                }, 1000);
+            } else {
+                showError('Tên đăng nhập hoặc mật khẩu không đúng!');
+            }
+        }
+
+        function handleRegister(username, password) {
+            const users = JSON.parse(localStorage.getItem('registeredUsers') || '{}');
+            
+            if (users[username]) {
+                showError('Tên đăng nhập đã tồn tại!');
+                return;
+            }
+            
+            users[username] = hashPassword(password);
+            localStorage.setItem('registeredUsers', JSON.stringify(users));
+            showSuccess('Đăng ký thành công! Vui lòng đăng nhập.');
+            
+            setTimeout(() => {
+                toggleAuthMode();
+            }, 1500);
+        }
+
+        function hashPassword(password) {
+            // Sử dụng CryptoJS để hash password (đơn giản)
+            return CryptoJS.SHA256(password).toString();
+        }
+
+        function toggleAuthMode() {
+            isRegistering = !isRegistering;
+            const title = document.getElementById('authTitle');
+            const submitBtn = document.getElementById('authSubmitBtn');
+            const toggleBtn = document.getElementById('toggleAuthBtn');
+            const confirmGroup = document.getElementById('confirmPasswordGroup');
+            
+            if (isRegistering) {
+                title.textContent = 'Đăng Ký';
+                submitBtn.textContent = 'Đăng Ký';
+                toggleBtn.textContent = 'Đã có tài khoản? Đăng nhập';
+                confirmGroup.style.display = 'block';
+            } else {
+                title.textContent = 'Đăng Nhập';
+                submitBtn.textContent = 'Đăng Nhập';
+                toggleBtn.textContent = 'Chưa có tài khoản? Đăng ký';
+                confirmGroup.style.display = 'none';
+            }
+            
+            clearMessages();
+        }
+
+        function showChatScreen() {
+            document.getElementById('authScreen').classList.add('hidden');
+            document.getElementById('chatScreen').classList.remove('hidden');
+            document.getElementById('currentUser').textContent = currentUser;
+            
+            // Mô phỏng kết nối với các user khác
+            simulateOnlineUsers();
+        }
+
+        function logout() {
+            localStorage.removeItem('currentUser');
+            currentUser = '';
+            encryptionKey = '';
+            document.getElementById('chatScreen').classList.add('hidden');
+            document.getElementById('authScreen').classList.remove('hidden');
+            
+            // Reset form
+            document.getElementById('authForm').reset();
+            clearMessages();
+        }
+
+        // Quản lý mã hóa
+        function updateKeyLength() {
+            const key = document.getElementById('encryptionKey').value;
+            document.getElementById('keyLength').textContent = `Độ dài: ${key.length} ký tự`;
+        }
+
+        function setEncryptionKey() {
+            const key = document.getElementById('encryptionKey').value;
+            if (!key) {
+                showError('Vui lòng nhập khóa mã hóa!');
+                return;
+            }
+            
+            encryptionKey = key;
+            document.getElementById('encryptionStatus').innerHTML = `✅ Khóa đã đặt (${key.length} ký tự)`;
+            document.getElementById('messageInput').disabled = false;
+            document.getElementById('sendBtn').disabled = false;
+            
+            addSystemMessage(`Khóa mã hóa AES đã được đặt (độ dài: ${key.length} ký tự)`);
+        }
+
+        // Mã hóa/Giải mã tin nhắn
+        function encryptMessage(message) {
+            if (!encryptionKey) return message;
+            
+            try {
+                const encrypted = CryptoJS.AES.encrypt(message, encryptionKey).toString();
+                return encrypted;
+            } catch (e) {
+                console.error('Encryption error:', e);
+                return message;
+            }
+        }
+
+        function decryptMessage(encryptedMessage) {
+            if (!encryptionKey) return encryptedMessage;
+            
+            try {
+                const decrypted = CryptoJS.AES.decrypt(encryptedMessage, encryptionKey);
+                return decrypted.toString(CryptoJS.enc.Utf8);
+            } catch (e) {
+                console.error('Decryption error:', e);
+                return '[Không thể giải mã - Kiểm tra khóa]';
+            }
+        }
+
+        // Gửi và nhận tin nhắn
+        function sendMessage() {
+            const input = document.getElementById('messageInput');
+            const message = input.value.trim();
+            
+            if (!message || !encryptionKey) return;
+            
+            const encryptedMessage = encryptMessage(message);
+            
+            // Hiển thị tin nhắn của mình
+            addMessage(currentUser, message, true, true);
+            
+            // Mô phỏng gửi tin nhắn đến user khác (trong thực tế sẽ gửi qua socket)
+            setTimeout(() => {
+                simulateReceiveMessage(encryptedMessage);
+            }, 1000 + Math.random() * 2000);
+            
+            input.value = '';
+            input.style.height = 'auto';
+        }
+
+        function simulateReceiveMessage(encryptedMessage) {
+            const otherUsers = Object.keys(users).filter(u => u !== currentUser);
+            if (otherUsers.length === 0) return;
+            
+            const randomUser = otherUsers[Math.floor(Math.random() * otherUsers.length)];
+            const decryptedMessage = decryptMessage(encryptedMessage);
+            
+            addMessage(randomUser, decryptedMessage, false, true);
+        }
+
+        function addMessage(sender, message, isOwn, isEncrypted) {
+            const container = document.getElementById('messagesContainer');
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `message ${isOwn ? 'own' : ''}`;
+            
+            const now = new Date();
+            const timeStr = now.toLocaleTimeString('vi-VN', {hour: '2-digit', minute: '2-digit'});
+            
+            messageDiv.innerHTML = `
+                <div class="message-header">
+                    <strong>${sender}</strong>
+                    <span>${timeStr}</span>
+                </div>
+                <div class="message-bubble ${isOwn ? 'own' : 'other'}">
+                    ${message}
+                    ${isEncrypted ? '<div class="encryption-indicator">🔒 Đã mã hóa</div>' : ''}
+                </div>
+            `;
+            
+            container.appendChild(messageDiv);
+            container.scrollTop = container.scrollHeight;
+        }
+
+        function addSystemMessage(message) {
+            const container = document.getElementById('messagesContainer');
+            const messageDiv = document.createElement('div');
+            messageDiv.className = 'system-message';
+            messageDiv.textContent = message;
+            
+            container.appendChild(messageDiv);
+            container.scrollTop = container.scrollHeight;
+        }
+
+        // Mô phỏng người dùng online
+        function simulateOnlineUsers() {
+            const mockUsers = ['Alice', 'Bob', 'Charlie', 'Diana', 'Eve'];
+            const onlineUsers = mockUsers.slice(0, Math.floor(Math.random() * 4) + 2);
+            
+            // Thêm user hiện tại
+            if (!onlineUsers.includes(currentUser)) {
+                onlineUsers.push(currentUser);
+            }
+            
+            onlineUsers.forEach(user => {
+                users[user] = {
+                    name: user,
+                    online: true,
+                    lastSeen: new Date()
+                };
+            });
+            
+            updateUserList();
+            
+            // Mô phỏng thay đổi trạng thái online
+            setInterval(() => {
+                const userNames = Object.keys(users);
+                if (userNames.length > 1) {
+                    const randomUser = userNames[Math.floor(Math.random() * userNames.length)];
+                    if (randomUser !== currentUser) {
+                        users[randomUser].online = Math.random() > 0.3;
+                        updateUserList();
+                    }
+                }
+            }, 10000);
+        }
+
+        function updateUserList() {
+            const userList = document.getElementById('userList');
+            const userCount = document.getElementById('userCount');
+            
+            userList.innerHTML = '';
+            let onlineCount = 0;
+            
+            Object.values(users).forEach(user => {
+                if (user.online) onlineCount++;
+                
+                const li = document.createElement('li');
+                li.className = 'user-item';
+                li.innerHTML = `
+                    <div class="user-avatar">${user.name.charAt(0).toUpperCase()}</div>
+                    <span>${user.name}</span>
+                    ${user.name === currentUser ? '<small>(Bạn)</small>' : ''}
+                    ${user.online ? '' : '<small style="color: #999;">(Offline)</small>'}
+                `;
+                
+                if (!user.online) {
+                    li.style.opacity = '0.5';
+                }
+                
+                userList.appendChild(li);
+            });
+            
+            userCount.textContent = onlineCount;
+        }
+
+        // Utility functions
+        function showError(message) {
+            const errorDiv = document.getElementById('errorMessage');
+            errorDiv.textContent = message;
+            errorDiv.classList.remove('hidden');
+            
+            setTimeout(() => {
+                errorDiv.classList.add('hidden');
+            }, 5000);
+        }
+
+        function showSuccess(message) {
+            const successDiv = document.getElementById('successMessage');
+            successDiv.textContent = message;
+            successDiv.classList.remove('hidden');
+            
+            setTimeout(() => {
+                successDiv.classList.add('hidden');
+            }, 3000);
+        }
+
+        function clearMessages() {
+            document.getElementById('errorMessage').classList.add('hidden');
+            document.getElementById('successMessage').classList.add('hidden');
+        }
+
+        // Mô phỏng tin nhắn tự động (để demo)
+        function startAutoMessages() {
+            const demoMessages = [
+                'Chào bạn! 👋',
+                'Hôm nay thế nào?',
+                'Ứng dụng chat này rất bảo mật nhỉ! 🔒',
+                'Tin nhắn này được mã hóa AES đấy!',
+                'Bạn có thích giao diện không?'
+            ];
+            
+            setTimeout(() => {
+                if (encryptionKey && Object.keys(users).length > 1) {
+                    const randomMessage = demoMessages[Math.floor(Math.random() * demoMessages.length)];
+                    const encryptedMessage = encryptMessage(randomMessage);
+                    simulateReceiveMessage(encryptedMessage);
+                    
+                    // Lặp lại
+                    setTimeout(startAutoMessages, 15000 + Math.random() * 10000);
+                }
+            }, 5000);
+        }
+
+        // Bắt đầu demo tin nhắn tự động sau khi đăng nhập
+        setTimeout(() => {
+            if (currentUser) {
+                startAutoMessages();
+            }
+        }, 3000);
+    </script>
+</body>
+</html>
